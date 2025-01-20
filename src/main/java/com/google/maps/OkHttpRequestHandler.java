@@ -19,8 +19,10 @@ import com.google.gson.FieldNamingPolicy;
 import com.google.maps.GeoApiContext.RequestHandler;
 import com.google.maps.internal.ApiResponse;
 import com.google.maps.internal.ExceptionsAllowedToRetry;
+import com.google.maps.internal.HttpHeaders;
 import com.google.maps.internal.OkHttpPendingResult;
 import com.google.maps.internal.RateLimitExecutorService;
+import com.google.maps.metrics.RequestMetrics;
 import java.io.IOException;
 import java.net.Proxy;
 import java.util.concurrent.ExecutorService;
@@ -55,16 +57,28 @@ public class OkHttpRequestHandler implements GeoApiContext.RequestHandler {
       String hostName,
       String url,
       String userAgent,
+      String experienceIdHeaderValue,
       Class<R> clazz,
       FieldNamingPolicy fieldNamingPolicy,
       long errorTimeout,
       Integer maxRetries,
-      ExceptionsAllowedToRetry exceptionsAllowedToRetry) {
-    Request req =
-        new Request.Builder().get().header("User-Agent", userAgent).url(hostName + url).build();
+      ExceptionsAllowedToRetry exceptionsAllowedToRetry,
+      RequestMetrics metrics) {
+    Request.Builder builder = new Request.Builder().get().header("User-Agent", userAgent);
+    if (experienceIdHeaderValue != null) {
+      builder = builder.header(HttpHeaders.X_GOOG_MAPS_EXPERIENCE_ID, experienceIdHeaderValue);
+    }
+    Request req = builder.url(hostName + url).build();
 
     return new OkHttpPendingResult<>(
-        req, client, clazz, fieldNamingPolicy, errorTimeout, maxRetries, exceptionsAllowedToRetry);
+        req,
+        client,
+        clazz,
+        fieldNamingPolicy,
+        errorTimeout,
+        maxRetries,
+        exceptionsAllowedToRetry,
+        metrics);
   }
 
   @Override
@@ -73,21 +87,30 @@ public class OkHttpRequestHandler implements GeoApiContext.RequestHandler {
       String url,
       String payload,
       String userAgent,
+      String experienceIdHeaderValue,
       Class<R> clazz,
       FieldNamingPolicy fieldNamingPolicy,
       long errorTimeout,
       Integer maxRetries,
-      ExceptionsAllowedToRetry exceptionsAllowedToRetry) {
+      ExceptionsAllowedToRetry exceptionsAllowedToRetry,
+      RequestMetrics metrics) {
     RequestBody body = RequestBody.create(JSON, payload);
-    Request req =
-        new Request.Builder()
-            .post(body)
-            .header("User-Agent", userAgent)
-            .url(hostName + url)
-            .build();
+    Request.Builder builder = new Request.Builder().post(body).header("User-Agent", userAgent);
+
+    if (experienceIdHeaderValue != null) {
+      builder = builder.header(HttpHeaders.X_GOOG_MAPS_EXPERIENCE_ID, experienceIdHeaderValue);
+    }
+    Request req = builder.url(hostName + url).build();
 
     return new OkHttpPendingResult<>(
-        req, client, clazz, fieldNamingPolicy, errorTimeout, maxRetries, exceptionsAllowedToRetry);
+        req,
+        client,
+        clazz,
+        fieldNamingPolicy,
+        errorTimeout,
+        maxRetries,
+        exceptionsAllowedToRetry,
+        metrics);
   }
 
   @Override

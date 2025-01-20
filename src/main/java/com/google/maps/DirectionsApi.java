@@ -71,7 +71,7 @@ public class DirectionsApi {
 
     @Override
     public boolean successful() {
-      return "OK".equals(status) || "ZERO_RESULTS".equals(status);
+      return "OK".equals(status);
     }
 
     @Override
@@ -111,7 +111,10 @@ public class DirectionsApi {
     HIGHWAYS("highways"),
 
     /** Indicates that the calculated route should avoid ferries. */
-    FERRIES("ferries");
+    FERRIES("ferries"),
+
+    /** Indicates that the calculated route should avoid indoor areas. */
+    INDOOR("indoor");
 
     private final String restriction;
 

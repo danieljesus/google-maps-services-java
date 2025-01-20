@@ -44,10 +44,12 @@ public class ApiException extends Exception {
       return new MaxElementsExceededException(errorMessage);
     } else if ("MAX_ROUTE_LENGTH_EXCEEDED".equals(status)) {
       return new MaxRouteLengthExceededException(errorMessage);
+    } else if ("MAX_WAYPOINTS_EXCEEDED".equals(status)) {
+      return new MaxWaypointsExceededException(errorMessage);
     } else if ("NOT_FOUND".equals(status)) {
       return new NotFoundException(errorMessage);
     } else if ("OVER_QUERY_LIMIT".equals(status)) {
-      if ("You have exceeded your daily request quota for this API."
+      if ("You have exceeded your daily request quota for this API. If you did not set a custom daily request quota, verify your project has an active billing account: http://g.co/dev/maps-no-account"
           .equalsIgnoreCase(errorMessage)) {
         return new OverDailyLimitException(errorMessage);
       }

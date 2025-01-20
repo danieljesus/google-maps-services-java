@@ -28,6 +28,8 @@ import com.google.maps.GeoApiContext.RequestHandler;
 import com.google.maps.internal.ApiResponse;
 import com.google.maps.internal.ExceptionsAllowedToRetry;
 import com.google.maps.internal.GaePendingResult;
+import com.google.maps.internal.HttpHeaders;
+import com.google.maps.metrics.RequestMetrics;
 import java.net.MalformedURLException;
 import java.net.Proxy;
 import java.net.URL;
@@ -51,22 +53,35 @@ public class GaeRequestHandler implements GeoApiContext.RequestHandler {
       String hostName,
       String url,
       String userAgent,
+      String experienceIdHeaderValue,
       Class<R> clazz,
       FieldNamingPolicy fieldNamingPolicy,
       long errorTimeout,
       Integer maxRetries,
-      ExceptionsAllowedToRetry exceptionsAllowedToRetry) {
+      ExceptionsAllowedToRetry exceptionsAllowedToRetry,
+      RequestMetrics metrics) {
     FetchOptions fetchOptions = FetchOptions.Builder.withDeadline(10);
     HTTPRequest req;
     try {
       req = new HTTPRequest(new URL(hostName + url), HTTPMethod.POST, fetchOptions);
+      if (experienceIdHeaderValue != null) {
+        req.setHeader(
+            new HTTPHeader(HttpHeaders.X_GOOG_MAPS_EXPERIENCE_ID, experienceIdHeaderValue));
+      }
     } catch (MalformedURLException e) {
       LOG.error("Request: {}{}", hostName, url, e);
       throw (new RuntimeException(e));
     }
 
     return new GaePendingResult<>(
-        req, client, clazz, fieldNamingPolicy, errorTimeout, maxRetries, exceptionsAllowedToRetry);
+        req,
+        client,
+        clazz,
+        fieldNamingPolicy,
+        errorTimeout,
+        maxRetries,
+        exceptionsAllowedToRetry,
+        metrics);
   }
 
   @Override
@@ -75,16 +90,22 @@ public class GaeRequestHandler implements GeoApiContext.RequestHandler {
       String url,
       String payload,
       String userAgent,
+      String experienceIdHeaderValue,
       Class<R> clazz,
       FieldNamingPolicy fieldNamingPolicy,
       long errorTimeout,
       Integer maxRetries,
-      ExceptionsAllowedToRetry exceptionsAllowedToRetry) {
+      ExceptionsAllowedToRetry exceptionsAllowedToRetry,
+      RequestMetrics metrics) {
     FetchOptions fetchOptions = FetchOptions.Builder.withDeadline(10);
     HTTPRequest req = null;
     try {
       req = new HTTPRequest(new URL(hostName + url), HTTPMethod.POST, fetchOptions);
       req.setHeader(new HTTPHeader("Content-Type", "application/json; charset=utf-8"));
+      if (experienceIdHeaderValue != null) {
+        req.setHeader(
+            new HTTPHeader(HttpHeaders.X_GOOG_MAPS_EXPERIENCE_ID, experienceIdHeaderValue));
+      }
       req.setPayload(payload.getBytes(UTF_8));
     } catch (MalformedURLException e) {
       LOG.error("Request: {}{}", hostName, url, e);
@@ -92,7 +113,14 @@ public class GaeRequestHandler implements GeoApiContext.RequestHandler {
     }
 
     return new GaePendingResult<>(
-        req, client, clazz, fieldNamingPolicy, errorTimeout, maxRetries, exceptionsAllowedToRetry);
+        req,
+        client,
+        clazz,
+        fieldNamingPolicy,
+        errorTimeout,
+        maxRetries,
+        exceptionsAllowedToRetry,
+        metrics);
   }
 
   @Override

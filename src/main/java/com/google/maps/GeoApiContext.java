@@ -21,7 +21,14 @@ import com.google.maps.errors.OverQueryLimitException;
 import com.google.maps.internal.ApiConfig;
 import com.google.maps.internal.ApiResponse;
 import com.google.maps.internal.ExceptionsAllowedToRetry;
+import com.google.maps.internal.HttpHeaders;
+import com.google.maps.internal.StringJoin;
 import com.google.maps.internal.UrlSigner;
+import com.google.maps.metrics.NoOpRequestMetricsReporter;
+import com.google.maps.metrics.RequestMetrics;
+import com.google.maps.metrics.RequestMetricsReporter;
+import java.io.Closeable;
+import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.Proxy;
 import java.net.URLEncoder;
@@ -46,7 +53,7 @@ import java.util.concurrent.TimeUnit;
  * <p>When you are finished with a GeoApiContext object, you must call {@link #shutdown()} on it to
  * release its resources.
  */
-public class GeoApiContext {
+public class GeoApiContext implements Closeable {
 
   private static final String VERSION = "@VERSION@"; // Populated by the build script
   private static final String USER_AGENT = "GoogleGeoApiClientJava/" + VERSION;
@@ -61,6 +68,8 @@ public class GeoApiContext {
   private final ExceptionsAllowedToRetry exceptionsAllowedToRetry;
   private final Integer maxRetries;
   private final UrlSigner urlSigner;
+  private String experienceIdHeaderValue;
+  private final RequestMetricsReporter requestMetricsReporter;
 
   /* package */
   GeoApiContext(
@@ -72,7 +81,9 @@ public class GeoApiContext {
       long errorTimeout,
       ExceptionsAllowedToRetry exceptionsAllowedToRetry,
       Integer maxRetries,
-      UrlSigner urlSigner) {
+      UrlSigner urlSigner,
+      RequestMetricsReporter requestMetricsReporter,
+      String... experienceIdHeaderValue) {
     this.requestHandler = requestHandler;
     this.apiKey = apiKey;
     this.baseUrlOverride = baseUrlOverride;
@@ -82,6 +93,18 @@ public class GeoApiContext {
     this.exceptionsAllowedToRetry = exceptionsAllowedToRetry;
     this.maxRetries = maxRetries;
     this.urlSigner = urlSigner;
+    this.requestMetricsReporter = requestMetricsReporter;
+    setExperienceId(experienceIdHeaderValue);
+  }
+
+  /**
+   * standard Java API to reclaim resources
+   *
+   * @throws IOException
+   */
+  @Override
+  public void close() throws IOException {
+    shutdown();
   }
 
   /**
@@ -98,22 +121,26 @@ public class GeoApiContext {
         String hostName,
         String url,
         String userAgent,
+        String experienceIdHeaderValue,
         Class<R> clazz,
         FieldNamingPolicy fieldNamingPolicy,
         long errorTimeout,
         Integer maxRetries,
-        ExceptionsAllowedToRetry exceptionsAllowedToRetry);
+        ExceptionsAllowedToRetry exceptionsAllowedToRetry,
+        RequestMetrics metrics);
 
     <T, R extends ApiResponse<T>> PendingResult<T> handlePost(
         String hostName,
         String url,
         String payload,
         String userAgent,
+        String experienceIdHeaderValue,
         Class<R> clazz,
         FieldNamingPolicy fieldNamingPolicy,
         long errorTimeout,
         Integer maxRetries,
-        ExceptionsAllowedToRetry exceptionsAllowedToRetry);
+        ExceptionsAllowedToRetry exceptionsAllowedToRetry,
+        RequestMetrics metrics);
 
     void shutdown();
 
@@ -134,6 +161,34 @@ public class GeoApiContext {
 
       RequestHandler build();
     }
+  }
+
+  /**
+   * Sets the value for the HTTP header field name {@link HttpHeaders#X_GOOG_MAPS_EXPERIENCE_ID} to
+   * be used on subsequent API calls. Calling this method with {@code null} is equivalent to calling
+   * {@link #clearExperienceId()}.
+   *
+   * @param experienceId The experience ID if set, otherwise null
+   */
+  public void setExperienceId(String... experienceId) {
+    if (experienceId == null || experienceId.length == 0) {
+      experienceIdHeaderValue = null;
+      return;
+    }
+    experienceIdHeaderValue = StringJoin.join(",", experienceId);
+  }
+
+  /** @return Returns the experience ID if set, otherwise, null */
+  public String getExperienceId() {
+    return experienceIdHeaderValue;
+  }
+
+  /**
+   * Clears the experience ID if set the HTTP header field {@link
+   * HttpHeaders#X_GOOG_MAPS_EXPERIENCE_ID} will be omitted from subsequent calls.
+   */
+  public void clearExperienceId() {
+    experienceIdHeaderValue = null;
   }
 
   /**
@@ -171,7 +226,8 @@ public class GeoApiContext {
         config.hostName,
         config.path,
         config.supportsClientId,
-        query.toString());
+        query.toString(),
+        requestMetricsReporter.newRequest(config.path));
   }
 
   <T, R extends ApiResponse<T>> PendingResult<T> get(
@@ -210,7 +266,8 @@ public class GeoApiContext {
         config.hostName,
         config.path,
         config.supportsClientId,
-        query.toString());
+        query.toString(),
+        requestMetricsReporter.newRequest(config.path));
   }
 
   <T, R extends ApiResponse<T>> PendingResult<T> post(
@@ -240,11 +297,13 @@ public class GeoApiContext {
         url.toString(),
         params.get("_payload").get(0),
         USER_AGENT,
+        experienceIdHeaderValue,
         clazz,
         config.fieldNamingPolicy,
         errorTimeout,
         maxRetries,
-        exceptionsAllowedToRetry);
+        exceptionsAllowedToRetry,
+        requestMetricsReporter.newRequest(config.path));
   }
 
   private <T, R extends ApiResponse<T>> PendingResult<T> getWithPath(
@@ -253,7 +312,8 @@ public class GeoApiContext {
       String hostName,
       String path,
       boolean canUseClientId,
-      String encodedPath) {
+      String encodedPath,
+      RequestMetrics metrics) {
     checkContext(canUseClientId);
     if (!encodedPath.startsWith("&")) {
       throw new IllegalArgumentException("encodedPath must start with &");
@@ -280,11 +340,13 @@ public class GeoApiContext {
         hostName,
         url.toString(),
         USER_AGENT,
+        experienceIdHeaderValue,
         clazz,
         fieldNamingPolicy,
         errorTimeout,
         maxRetries,
-        exceptionsAllowedToRetry);
+        exceptionsAllowedToRetry,
+        metrics);
   }
 
   private void checkContext(boolean canUseClientId) {
@@ -312,6 +374,8 @@ public class GeoApiContext {
     private ExceptionsAllowedToRetry exceptionsAllowedToRetry = new ExceptionsAllowedToRetry();
     private Integer maxRetries;
     private UrlSigner urlSigner;
+    private RequestMetricsReporter requestMetricsReporter = new NoOpRequestMetricsReporter();
+    private String[] experienceIdHeaderValue;
 
     /** Builder pattern for the enclosing {@code GeoApiContext}. */
     public Builder() {
@@ -374,7 +438,8 @@ public class GeoApiContext {
     }
 
     /**
-     * Sets the ClientID/Secret pair to use for authorizing requests.
+     * Sets the ClientID/Secret pair to use for authorizing requests. Most users should use {@link
+     * #apiKey(String)} instead.
      *
      * @param clientId The Client ID to use.
      * @param cryptographicSecret The Secret to use.
@@ -534,6 +599,23 @@ public class GeoApiContext {
     }
 
     /**
+     * Sets the value for the HTTP header field name {@link HttpHeaders#X_GOOG_MAPS_EXPERIENCE_ID}
+     * HTTP header value for the field name on subsequent API calls.
+     *
+     * @param experienceId The experience ID
+     * @return Returns this builder for call chaining.
+     */
+    public Builder experienceId(String... experienceId) {
+      this.experienceIdHeaderValue = experienceId;
+      return this;
+    }
+
+    public Builder requestMetricsReporter(RequestMetricsReporter requestMetricsReporter) {
+      this.requestMetricsReporter = requestMetricsReporter;
+      return this;
+    }
+
+    /**
      * Converts this builder into a {@code GeoApiContext}.
      *
      * @return Returns the built {@code GeoApiContext}.
@@ -548,7 +630,9 @@ public class GeoApiContext {
           errorTimeout,
           exceptionsAllowedToRetry,
           maxRetries,
-          urlSigner);
+          urlSigner,
+          requestMetricsReporter,
+          experienceIdHeaderValue);
     }
   }
 }

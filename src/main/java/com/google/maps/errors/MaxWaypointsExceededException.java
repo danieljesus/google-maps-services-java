@@ -1,5 +1,5 @@
 /*
- * Copyright 2014 Google Inc. All rights reserved.
+ * Copyright 2019 Google Inc. All rights reserved.
  *
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this
@@ -16,19 +16,15 @@
 package com.google.maps.errors;
 
 /**
- * Indicates that the requested route is too long and cannot be processed.
- *
- * <p>This error occurs when more complex directions are returned. Try reducing the number of
- * waypoints, turns, or instructions.
+ * Indicates that too many waypoints were provided in the request.
  *
  * @see <a href="https://developers.google.com/maps/documentation/directions/intro#StatusCodes">
  *     Status Codes</a>
  */
-public class MaxRouteLengthExceededException extends ApiException {
+public class MaxWaypointsExceededException extends ApiException {
+  private static final long serialVersionUID = 1L;
 
-  private static final long serialVersionUID = 5926526363472768479L;
-
-  public MaxRouteLengthExceededException(String errorMessage) {
+  public MaxWaypointsExceededException(String errorMessage) {
     super(errorMessage);
   }
 }

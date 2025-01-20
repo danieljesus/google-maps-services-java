@@ -23,6 +23,7 @@ import com.google.maps.GeolocationApi;
 import com.google.maps.ImageResult;
 import com.google.maps.PendingResult;
 import com.google.maps.errors.ApiException;
+import com.google.maps.metrics.RequestMetrics;
 import com.google.maps.model.AddressComponentType;
 import com.google.maps.model.AddressType;
 import com.google.maps.model.Distance;
@@ -34,6 +35,7 @@ import com.google.maps.model.OpeningHours.Period.OpenClose.DayOfWeek;
 import com.google.maps.model.PlaceDetails.Review.AspectRating.RatingType;
 import com.google.maps.model.PriceLevel;
 import com.google.maps.model.TravelMode;
+import com.google.maps.model.VehicleType;
 import java.io.IOException;
 import java.time.Instant;
 import java.time.LocalTime;
@@ -65,6 +67,7 @@ public class OkHttpPendingResult<T, R extends ApiResponse<T>>
   private final Class<R> responseClass;
   private final FieldNamingPolicy fieldNamingPolicy;
   private final Integer maxRetries;
+  private final RequestMetrics metrics;
 
   private Call call;
   private Callback<T> callback;
@@ -92,7 +95,8 @@ public class OkHttpPendingResult<T, R extends ApiResponse<T>>
       FieldNamingPolicy fieldNamingPolicy,
       long errorTimeOut,
       Integer maxRetries,
-      ExceptionsAllowedToRetry exceptionsAllowedToRetry) {
+      ExceptionsAllowedToRetry exceptionsAllowedToRetry,
+      RequestMetrics metrics) {
     this.request = request;
     this.client = client;
     this.responseClass = responseClass;
@@ -100,7 +104,9 @@ public class OkHttpPendingResult<T, R extends ApiResponse<T>>
     this.errorTimeOut = errorTimeOut;
     this.maxRetries = maxRetries;
     this.exceptionsAllowedToRetry = exceptionsAllowedToRetry;
+    this.metrics = metrics;
 
+    metrics.startNetwork();
     this.call = client.newCall(request);
   }
 
@@ -162,11 +168,13 @@ public class OkHttpPendingResult<T, R extends ApiResponse<T>>
         new okhttp3.Callback() {
           @Override
           public void onFailure(Call call, IOException e) {
+            metrics.endNetwork();
             waiter.add(new QueuedResponse(parent, e));
           }
 
           @Override
           public void onResponse(Call call, Response response) throws IOException {
+            metrics.endNetwork();
             waiter.add(new QueuedResponse(parent, response));
           }
         });
@@ -175,6 +183,7 @@ public class OkHttpPendingResult<T, R extends ApiResponse<T>>
     if (r.response != null) {
       return parseResponse(r.request, r.response);
     } else {
+      metrics.endRequest(r.e, 0, retryCounter);
       throw r.e;
     }
   }
@@ -195,13 +204,16 @@ public class OkHttpPendingResult<T, R extends ApiResponse<T>>
 
   @Override
   public void onFailure(Call call, IOException ioe) {
+    metrics.endNetwork();
     if (callback != null) {
+      metrics.endRequest(ioe, 0, retryCounter);
       callback.onFailure(ioe);
     }
   }
 
   @Override
   public void onResponse(Call call, Response response) throws IOException {
+    metrics.endNetwork();
     if (callback != null) {
       try {
         callback.onResult(parseResponse(this, response));
@@ -213,6 +225,19 @@ public class OkHttpPendingResult<T, R extends ApiResponse<T>>
 
   @SuppressWarnings("unchecked")
   private T parseResponse(OkHttpPendingResult<T, R> request, Response response)
+      throws ApiException, InterruptedException, IOException {
+    try {
+      T result = parseResponseInternal(request, response);
+      metrics.endRequest(null, response.code(), retryCounter);
+      return result;
+    } catch (Exception e) {
+      metrics.endRequest(e, response.code(), retryCounter);
+      throw e;
+    }
+  }
+
+  @SuppressWarnings("unchecked")
+  private T parseResponseInternal(OkHttpPendingResult<T, R> request, Response response)
       throws ApiException, InterruptedException, IOException {
     if (shouldRetry(response)) {
       // since we are retrying the request we must close the response
@@ -256,6 +281,8 @@ public class OkHttpPendingResult<T, R extends ApiResponse<T>>
                 LocationType.class, new SafeEnumAdapter<LocationType>(LocationType.UNKNOWN))
             .registerTypeAdapter(
                 RatingType.class, new SafeEnumAdapter<RatingType>(RatingType.UNKNOWN))
+            .registerTypeAdapter(
+                VehicleType.class, new SafeEnumAdapter<VehicleType>(VehicleType.OTHER))
             .registerTypeAdapter(DayOfWeek.class, new DayOfWeekAdapter())
             .registerTypeAdapter(PriceLevel.class, new PriceLevelAdapter())
             .registerTypeAdapter(Instant.class, new InstantAdapter())
@@ -298,6 +325,7 @@ public class OkHttpPendingResult<T, R extends ApiResponse<T>>
   private T retry() throws ApiException, InterruptedException, IOException {
     retryCounter++;
     LOG.info("Retrying request. Retry #" + retryCounter);
+    metrics.startNetwork();
     this.call = client.newCall(request);
     return this.await();
   }

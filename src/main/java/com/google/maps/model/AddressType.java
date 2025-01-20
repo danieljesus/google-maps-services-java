@@ -131,6 +131,9 @@ public enum AddressType implements UrlValue {
   /** A postal code prefix as used to address postal mail within the country. */
   POSTAL_CODE_SUFFIX("postal_code_suffix"),
 
+  /* Plus code */
+  PLUS_CODE("plus_code"),
+
   /** A prominent natural feature. */
   NATURAL_FEATURE("natural_feature"),
 
@@ -176,6 +179,9 @@ public enum AddressType implements UrlValue {
   /** The location of a primary school. */
   PRIMARY_SCHOOL("primary_school"),
 
+  /** The location of a secondary school. */
+  SECONDARY_SCHOOL("secondary_school"),
+
   /** The location of a finance institute. */
   FINANCE("finance"),
 
@@ -202,6 +208,9 @@ public enum AddressType implements UrlValue {
 
   /** Currently not a documented return type. */
   STORE("store"),
+
+  /** The location of a drugstore. */
+  DRUGSTORE("drugstore"),
 
   /** Currently not a documented return type. */
   LAWYER("lawyer"),
@@ -451,6 +460,9 @@ public enum AddressType implements UrlValue {
 
   /** A tourist attraction */
   TOURIST_ATTRACTION("tourist_attraction"),
+
+  /** Currently not a documented return type. */
+  TOWN_SQUARE("town_square"),
 
   /**
    * Indicates an unknown address type returned by the server. The Java Client for Google Maps

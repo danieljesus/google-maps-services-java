@@ -26,7 +26,6 @@ apply plugin: 'jacoco'
 apply plugin: 'com.github.kt3k.coveralls'
 apply plugin: 'com.github.sherter.google-java-format'
 
-archivesBaseName = 'google-maps-services'
 group = 'com.google.maps'
 sourceCompatibility = 1.8
 
@@ -53,7 +52,8 @@ artifacts {
 dependencies {
     compileOnly 'com.google.appengine:appengine-api-1.0-sdk:1.9.76'
     api 'com.squareup.okhttp3:okhttp:3.14.4'
-    api 'com.google.code.gson:gson:2.8.5'
+    api 'com.google.code.gson:gson:2.8.6'
+    api 'io.opencensus:opencensus-api:0.25.0'
     implementation 'org.slf4j:slf4j-api:1.7.26'
     testImplementation 'junit:junit:4.12'
     testImplementation 'org.mockito:mockito-core:3.0.0'
@@ -62,6 +62,7 @@ dependencies {
     testImplementation 'org.slf4j:slf4j-simple:1.7.26'
     testImplementation 'org.apache.commons:commons-lang3:3.9'
     testImplementation 'org.json:json:20180813'
+    testImplementation 'io.opencensus:opencensus-impl:0.25.0'
 }
 
 task updateVersion(type: Copy) {
@@ -86,6 +87,11 @@ tasks.withType(Test) {
     systemProperty 'client.secret', System.getProperty('client.secret')
 }
 
+java {
+    withJavadocJar()
+    withSourcesJar()
+}
+
 javadoc {
     exclude '**/internal/**'
     def currentJavaVersion = org.gradle.api.JavaVersion.current()
@@ -101,6 +107,8 @@ jacocoTestReport {
         html.enabled = true
     }
 }
+
+ext.artifactId = 'google-maps-services'
 
 publishing {
     publications {
@@ -143,12 +151,22 @@ publishing {
                         id = 'broady'
                         name = 'Chris Broadfoot'
                     }
+                    developer {
+                        id = 'chrisarriola'
+                        name = 'Christopher Arriola'
+                    }
                 }
             }
             groupId group
-            artifactId 'google-maps-services'
+            artifactId project.ext.artifactId
             version version
             from components.java
+        }
+        gpr(MavenPublication) {
+            groupId group
+            artifactId project.ext.artifactId
+            version version
+            from(components.java)
         }
     }
     repositories {
@@ -157,6 +175,14 @@ publishing {
             credentials {
                 username sonatypeUsername
                 password sonatypePassword
+            }
+        }
+        maven {
+            name = "GitHubPackages"
+            url = uri("https://maven.pkg.github.com/googlemaps/google-maps-services-java")
+            credentials {
+                username = 'googlemaps-bot'
+                password = githubPassword
             }
         }
     }
