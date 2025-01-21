@@ -15,16 +15,6 @@
 
 package com.google.maps;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-
-import java.awt.image.BufferedImage;
-import java.io.IOException;
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.nio.charset.Charset;
-import java.util.List;
-import javax.imageio.ImageIO;
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
 import okhttp3.mockwebserver.RecordedRequest;
@@ -32,6 +22,18 @@ import okio.Buffer;
 import org.apache.http.NameValuePair;
 import org.apache.http.client.utils.URLEncodedUtils;
 import org.json.JSONObject;
+
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
+import java.io.IOException;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.nio.charset.Charset;
+import java.util.List;
+
+import static org.hamcrest.CoreMatchers.is;
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.junit.Assert.assertEquals;
 
 /** Local test mock server for unit tests. */
 public class LocalTestServerContext implements AutoCloseable {
@@ -111,10 +113,10 @@ public class LocalTestServerContext implements AutoCloseable {
     for (NameValuePair pair : params) {
       if (pair.getName().equals(paramName)) {
         paramFound = true;
-        assertEquals(expected, pair.getValue());
+        assertThat(expected, is(pair.getValue()));
       }
     }
-    assertTrue(paramFound);
+    assertThat(paramFound, is(true));
   }
 
   void assertParamValues(List<String> expecteds, String paramName)
