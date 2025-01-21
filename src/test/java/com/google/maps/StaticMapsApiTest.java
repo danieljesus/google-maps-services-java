@@ -36,14 +36,14 @@ import org.junit.Test;
 
 public class StaticMapsApiTest {
 
-  private final int WIDTH = 640;
-  private final int HEIGHT = 480;
-  private final LatLng MELBOURNE = new LatLng(-37.8136, 144.9630);
-  private final LatLng SYDNEY = new LatLng(-33.8688, 151.2093);
+  private static final int WIDTH = 640;
+  private static final int HEIGHT = 480;
+  private static final LatLng MELBOURNE = new LatLng(-37.8136, 144.9630);
+  private static final LatLng SYDNEY = new LatLng(-33.8688, 151.2093);
   /** This encoded path matches the exact [MELBOURNE, SYDNEY] points. */
-  private final String MELBOURNE_TO_SYDNEY_ENCODED_POLYLINE = "~mxeFwaxsZ_naWk~be@";
+  private static final String MELBOURNE_TO_SYDNEY_ENCODED_POLYLINE = "~mxeFwaxsZ_naWk~be@";
 
-  private final BufferedImage IMAGE = new BufferedImage(WIDTH, HEIGHT, BufferedImage.TYPE_INT_ARGB);
+  private static final BufferedImage IMAGE = new BufferedImage(WIDTH, HEIGHT, BufferedImage.TYPE_INT_ARGB);
 
   @Test
   public void testGetSydneyStaticMap() throws Exception {
@@ -92,6 +92,7 @@ public class StaticMapsApiTest {
       req.maptype(StaticMapType.hybrid);
       req.region("AU");
       req.visible("Melbourne");
+      req.mapId("mapId");
       req.await();
 
       sc.assertParamValue("640x480", "size");
@@ -102,6 +103,7 @@ public class StaticMapsApiTest {
       sc.assertParamValue("hybrid", "maptype");
       sc.assertParamValue("AU", "region");
       sc.assertParamValue("Melbourne", "visible");
+      sc.assertParamValue("mapId", "map_id");
     }
   }
 

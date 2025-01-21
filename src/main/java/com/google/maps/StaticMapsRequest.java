@@ -467,4 +467,16 @@ public class StaticMapsRequest
   public StaticMapsRequest visible(String visibleLocation) {
     return param("visible", visibleLocation);
   }
+
+    /**
+     * <code>map_id</code> is a unique identifier that you can use to adjust features and styling.
+     *
+     * @param mapId The unique identifier of the map.
+     * @return Returns this {@code StaticMapsRequest} for call chaining.
+     */
+  public StaticMapsRequest mapId(String mapId) {
+    return paramAddToList("map_id", mapId);
+  }
+
+
 }
